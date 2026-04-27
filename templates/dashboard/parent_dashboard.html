@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Parent Dashboard - QR Attendance System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">
+                <i class="bi bi-person-heart text-info me-2"></i>Parent Dashboard
+            </h2>
+            <p class="text-muted mb-0">Welcome, {{ parent.user_profile.user.get_full_name }}</p>
+        </div>
+        <div>
+            <span class="badge bg-info fs-6">
+                <i class="bi bi-person-heart me-1"></i>Parent
+            </span>
+        </div>
+    </div>
+
+    <!-- Children's Attendance -->
+    {% for child_data in children_attendance %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0">
+                    <i class="bi bi-mortarboard text-primary me-2"></i>
+                    {{ child_data.child.user_profile.user.get_full_name }}
+                </h5>
+                <small class="text-muted">
+                    Student ID: {{ child_data.child.student_id }}
+                    {% if child_data.child.class_group %}
+                    | Class: {{ child_data.child.class_group.name }}
+                    {% endif %}
+                </small>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-success">{{ child_data.present_count }} Present</span>
+                <span class="badge bg-secondary">{{ child_data.total_attendance }} Total</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if child_data.attendance %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Location</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for attendance in child_data.attendance %}
+                        <tr>
+                            <td>{{ attendance.date|date:"M d, Y" }}</td>
+                            <td>{{ attendance.time_in|time:"H:i" }}</td>
+                            <td>
+                                <span class="badge bg-{% if attendance.status == 'present' %}success{% elif attendance.status == 'late' %}warning{% else %}danger{% endif %}">
+                                    {{ attendance.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if attendance.distance_from_school %}
+                                    <span class="text-success">
+                                        <i class="bi bi-geo-alt me-1"></i>{{ attendance.distance_from_school }}m from school
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <p class="text-muted mt-2">No attendance records for {{ child_data.child.user_profile.user.first_name }} yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-people fs-1 text-muted mb-3"></i>
+            <h5>No Children Found</h5>
+            <p class="text-muted">You don't have any children registered in the system yet.</p>
+            <p class="text-muted">Please contact the school administration to link your account with your child's records.</p>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- SMS Notification Log -->
+    {% if sms_logs %}
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">
+                <i class="bi bi-chat-dots text-success me-2"></i>
+                SMS Notifications
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+                {% for sms in sms_logs|slice:":10" %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="mb-1">{{ sms.message }}</p>
+                            <small class="text-muted">{{ sms.timestamp|date:"M d, Y H:i" }}</small>
+                        </div>
+                        <span class="badge bg-{{ sms.status|yesno:'success,danger' }}">
+                            {{ sms.status|title }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

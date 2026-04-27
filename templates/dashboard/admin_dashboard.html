@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Admin Dashboard - QR Attendance System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">
+                <i class="bi bi-speedometer2 text-primary me-2"></i>Admin Dashboard
+            </h2>
+            <p class="text-muted mb-0">System Overview & Management</p>
+        </div>
+        <div>
+            <span class="badge bg-primary fs-6">
+                <i class="bi bi-shield-check me-1"></i>Administrator
+            </span>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-people fs-1 mb-2"></i>
+                    <h3 class="mb-0">{{ total_students }}</h3>
+                    <small>Students</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-person-workspace fs-1 mb-2"></i>
+                    <h3 class="mb-0">{{ total_teachers }}</h3>
+                    <small>Teachers</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-person-heart fs-1 mb-2"></i>
+                    <h3 class="mb-0">{{ total_parents }}</h3>
+                    <small>Parents</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card bg-warning text-dark h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-building fs-1 mb-2"></i>
+                    <h3 class="mb-0">{{ total_classes }}</h3>
+                    <small>Classes</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Today's Attendance -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar-check text-success me-2"></i>
+                        Today's Attendance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h1 class="display-4 text-primary mb-0">{{ today_attendance }}</h1>
+                        <small class="text-muted">Students Present Today</small>
+                    </div>
+                    
+                    {% if recent_attendances %}
+                    <h6 class="text-muted mb-2">Recent Activity</h6>
+                    <div class="list-group list-group-flush">
+                        {% for attendance in recent_attendances|slice:":5" %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <strong>{{ attendance.student.user_profile.user.get_full_name }}</strong>
+                                <br><small class="text-muted">{{ attendance.class_group.name }}</small>
+                            </div>
+                            <span class="badge bg-{{ attendance.status|yesno:'success,warning,danger' }}">
+                                {{ attendance.get_status_display }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">No attendance records yet today.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- SMS Notifications -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-chat-dots text-info me-2"></i>
+                        SMS Notifications
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_sms %}
+                    <div class="list-group list-group-flush">
+                        {% for sms in recent_sms|slice:":10" %}
+                        <div class="list-group-item px-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>To: {{ sms.parent.user_profile.user.get_full_name }}</strong>
+                                    <br><small class="text-muted">{{ sms.timestamp|date:"M d, Y H:i" }}</small>
+                                </div>
+                                <span class="badge bg-{{ sms.status|yesno:'success,danger' }}">
+                                    {{ sms.status|title }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">No SMS notifications sent yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">
+                <i class="bi bi-lightning-charge text-warning me-2"></i>
+                Quick Actions
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-6 col-md-3">
+                    <a href="/admin/accounts/student/" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-people me-2"></i>Manage Students
+                    </a>
+                </div>
+                <div class="col-6 col-md-3">
+                    <a href="/admin/accounts/teacher/" class="btn btn-outline-success w-100">
+                        <i class="bi bi-person-workspace me-2"></i>Manage Teachers
+                    </a>
+                </div>
+                <div class="col-6 col-md-3">
+                    <a href="/admin/accounts/parent/" class="btn btn-outline-info w-100">
+                        <i class="bi bi-person-heart me-2"></i>Manage Parents
+                    </a>
+                </div>
+                <div class="col-6 col-md-3">
+                    <a href="/admin/attendance/attendance/" class="btn btn-outline-warning w-100">
+                        <i class="bi bi-clipboard-data me-2"></i>View Reports
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

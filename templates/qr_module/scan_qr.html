@@ -1,0 +1,386 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Scan QR Code - QR Attendance System{% endblock %}
+
+{% block extra_css %}
+<style>
+#reader {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+}
+#reader video {
+    border-radius: 10px;
+}
+.scanner-container {
+    position: relative;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.scan-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 200px;
+    border: 2px solid #00ff00;
+    border-radius: 10px;
+    pointer-events: none;
+}
+.scan-overlay::before,
+.scan-overlay::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-color: #00ff00;
+    border-style: solid;
+}
+.scan-overlay::before {
+    top: -2px;
+    left: -2px;
+    border-width: 3px 0 0 3px;
+}
+.scan-overlay::after {
+    bottom: -2px;
+    right: -2px;
+    border-width: 0 3px 3px 0;
+}
+.scanner-instructions {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+.gps-status {
+    font-size: 14px;
+}
+.gps-status.acquiring {
+    color: #ffc107;
+}
+.gps-status.ready {
+    color: #28a745;
+}
+.gps-status.error {
+    color: #dc3545;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="text-center mb-4">
+        <h2 class="mb-2">
+            <i class="bi bi-qr-code-scan text-primary me-2"></i>Scan QR Code
+        </h2>
+        <p class="text-muted">Point your camera at the teacher's QR code</p>
+    </div>
+
+    <!-- Instructions -->
+    <div class="scanner-instructions text-center">
+        <i class="bi bi-info-circle fs-1 mb-2 d-block"></i>
+        <p class="mb-0">
+            <strong>Step 1:</strong> Allow camera access<br>
+            <strong>Step 2:</strong> Allow GPS location<br>
+            <strong>Step 3:</strong> Scan the QR code shown by your teacher<br>
+            <strong>Step 4:</strong> Stay within {{ gps_radius }} meters of school
+        </p>
+    </div>
+
+    <!-- GPS Status -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1">
+                        <i class="bi bi-geo-alt-fill text-primary me-2"></i>GPS Status
+                    </h6>
+                    <p id="gpsStatus" class="gps-status acquiring mb-0">
+                        <i class="bi bi-arrow-repeat spin me-2"></i>Acquiring GPS location...
+                    </p>
+                    <small id="gpsDetails" class="text-muted d-none">
+                        Lat: <span id="latValue">--</span>, 
+                        Lng: <span id="lngValue">--</span>
+                    </small>
+                </div>
+                <button id="refreshGPS" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Scanner -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div id="reader" class="scanner-container">
+                <div class="text-center p-5 text-white">
+                    <i class="bi bi-camera fs-1 mb-3 d-block"></i>
+                    <p>Camera initializing...</p>
+                </div>
+            </div>
+            <div class="scan-overlay"></div>
+        </div>
+    </div>
+
+    <!-- Manual Entry (Fallback) -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <h6 class="mb-0">
+                <i class="bi bi-keyboard me-2"></i>Manual Entry
+            </h6>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small">If camera doesn't work, ask your teacher for the QR code value and enter it manually:</p>
+            <div class="input-group">
+                <input type="text" id="manualQR" class="form-control" placeholder="Enter QR code value">
+                <button class="btn btn-primary" onclick="submitManualQR()">
+                    <i class="bi bi-check-lg me-2"></i>Submit
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div id="resultIcon" class="mb-3">
+                    <div class="spinner-border text-primary" style="width: 4rem; height: 4rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <h4 id="resultTitle" class="mb-2">Processing...</h4>
+                <p id="resultMessage" class="text-muted mb-0">Please wait while we validate your attendance...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+let html5QrcodeScanner;
+let currentLatitude = null;
+let currentLongitude = null;
+let gpsRetryCount = 0;
+const MAX_GPS_RETRIES = 3;
+
+// School coordinates (from settings)
+const schoolLat = parseFloat('{{ school_lat }}');
+const schoolLng = parseFloat('{{ school_lng }}');
+const gpsRadius = parseInt('{{ gps_radius }}', 10);
+
+// Initialize GPS
+function initGPS() {
+    const gpsStatus = document.getElementById('gpsStatus');
+    const gpsDetails = document.getElementById('gpsDetails');
+    
+    if (!navigator.geolocation) {
+        gpsStatus.innerHTML = '<i class="bi bi-x-circle me-2"></i>GPS not supported';
+        gpsStatus.classList.remove('acquiring');
+        gpsStatus.classList.add('error');
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            currentLatitude = position.coords.latitude;
+            currentLongitude = position.coords.longitude;
+            
+            document.getElementById('latValue').textContent = currentLatitude.toFixed(6);
+            document.getElementById('lngValue').textContent = currentLongitude.toFixed(6);
+            
+            gpsStatus.innerHTML = '<i class="bi bi-check-circle me-2"></i>GPS Ready';
+            gpsStatus.classList.remove('acquiring');
+            gpsStatus.classList.add('ready');
+            gpsDetails.classList.remove('d-none');
+            
+            gpsRetryCount = 0;
+        },
+        (error) => {
+            console.error('GPS Error:', error);
+            
+            if (gpsRetryCount < MAX_GPS_RETRIES) {
+                gpsRetryCount++;
+                gpsStatus.innerHTML = `<i class="bi bi-arrow-repeat spin me-2"></i>Retrying GPS (${gpsRetryCount}/${MAX_GPS_RETRIES})...`;
+                setTimeout(initGPS, 2000);
+            } else {
+                gpsStatus.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>GPS Error: ' + getGPSErrorMessage(error);
+                gpsStatus.classList.remove('acquiring');
+                gpsStatus.classList.add('error');
+            }
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+
+function getGPSErrorMessage(error) {
+    switch(error.code) {
+        case error.PERMISSION_DENIED:
+            return "Please allow location access";
+        case error.POSITION_UNAVAILABLE:
+            return "Location unavailable";
+        case error.TIMEOUT:
+            return "Location request timed out";
+        default:
+            return "Unknown error";
+    }
+}
+
+// Refresh GPS button
+document.getElementById('refreshGPS').addEventListener('click', function() {
+    gpsRetryCount = 0;
+    const gpsStatus = document.getElementById('gpsStatus');
+    gpsStatus.innerHTML = '<i class="bi bi-arrow-repeat spin me-2"></i>Acquiring GPS location...';
+    gpsStatus.classList.remove('ready', 'error');
+    gpsStatus.classList.add('acquiring');
+    document.getElementById('gpsDetails').classList.add('d-none');
+    initGPS();
+});
+
+// Initialize QR Scanner
+function initQRScanner() {
+    html5QrcodeScanner = new Html5Qrcode("reader");
+    
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+    };
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanFailure
+    ).catch(err => {
+        console.error("QR Scanner Error:", err);
+        document.getElementById('reader').innerHTML = `
+            <div class="text-center p-5 text-white">
+                <i class="bi bi-camera-video-off fs-1 mb-3 d-block text-danger"></i>
+                <p class="text-danger">Camera access denied or not available.</p>
+                <p class="small">Please use manual entry below.</p>
+            </div>
+        `;
+    });
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+    // Stop scanning
+    html5QrcodeScanner.stop();
+    
+    // Submit attendance
+    submitAttendance(decodedText);
+}
+
+function onScanFailure(error) {
+    // console.warn(`QR scan error: ${error}`);
+}
+
+function submitManualQR() {
+    const qrValue = document.getElementById('manualQR').value.trim();
+    if (!qrValue) {
+        alert('Please enter a QR code value');
+        return;
+    }
+    submitAttendance(qrValue);
+}
+
+function submitAttendance(qrValue) {
+    // Check GPS
+    if (!currentLatitude || !currentLongitude) {
+        alert('Please wait for GPS location to be acquired. Click "Refresh" if needed.');
+        return;
+    }
+    
+    // Show processing modal
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    modal.show();
+    
+    // Prepare data
+    const data = {
+        qr_value: qrValue,
+        latitude: currentLatitude,
+        longitude: currentLongitude
+    };
+    
+    // Submit to server
+    fetch('/qr/submit/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrf-token]').content
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        const resultIcon = document.getElementById('resultIcon');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultMessage = document.getElementById('resultMessage');
+        
+        if (data.success) {
+            resultIcon.innerHTML = '<i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>';
+            resultTitle.textContent = 'Success!';
+            resultTitle.className = 'text-success mb-2';
+            resultMessage.innerHTML = `
+                <strong>${data.message}</strong><br>
+                <small class="text-muted">
+                    Distance from school: ${data.distance}m<br>
+                    ${data.sms_sent && data.sms_sent.sent ? '<i class="bi bi-check-circle text-success me-1"></i>SMS notification sent to parent' : ''}
+                </small>
+            `;
+            
+            // Redirect after 3 seconds
+            setTimeout(() => {
+                window.location.href = '/dashboard/student/';
+            }, 3000);
+        } else {
+            resultIcon.innerHTML = '<i class="bi bi-x-circle-fill text-danger" style="font-size: 4rem;"></i>';
+            resultTitle.textContent = 'Failed';
+            resultTitle.className = 'text-danger mb-2';
+            resultMessage.innerHTML = `<strong>${data.error}</strong>`;
+            
+            // Allow retry after 3 seconds
+            setTimeout(() => {
+                modal.hide();
+                initQRScanner();
+            }, 3000);
+        }
+    })
+    .catch(error => {
+        const resultIcon = document.getElementById('resultIcon');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultMessage = document.getElementById('resultMessage');
+        
+        resultIcon.innerHTML = '<i class="bi bi-x-circle-fill text-danger" style="font-size: 4rem;"></i>';
+        resultTitle.textContent = 'Error';
+        resultTitle.className = 'text-danger mb-2';
+        resultMessage.textContent = 'An error occurred. Please try again.';
+        
+        setTimeout(() => {
+            modal.hide();
+            initQRScanner();
+        }, 3000);
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initGPS();
+    initQRScanner();
+});
+</script>
+{% endblock %}

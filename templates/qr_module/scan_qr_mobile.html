@@ -1,0 +1,858 @@
+{% extends 'base_new.html' %}
+{% load static %}
+
+{% block title %}Scan Attendance - QR Attendance{% endblock %}
+
+{% block extra_css %}
+<style>
+.scanner-container {
+    position: relative;
+    background: #000;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+#reader {
+    width: 100%;
+    min-height: 300px;
+}
+
+#reader video {
+    border-radius: 20px;
+    object-fit: cover;
+}
+
+.scan-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 250px;
+    height: 250px;
+    border: 3px solid #00ff00;
+    border-radius: 20px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.scan-overlay::before,
+.scan-overlay::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border-color: #00ff00;
+    border-style: solid;
+}
+
+.scan-overlay::before {
+    top: -3px;
+    left: -3px;
+    border-width: 4px 0 0 4px;
+    border-radius: 15px 0 0 0;
+}
+
+.scan-overlay::after {
+    bottom: -3px;
+    right: -3px;
+    border-width: 0 4px 4px 0;
+    border-radius: 0 0 15px 0;
+}
+
+.scan-laser {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #00ff00;
+    box-shadow: 0 0 10px #00ff00;
+    animation: scan 2s linear infinite;
+    z-index: 11;
+}
+
+@keyframes scan {
+    0% { top: 0; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+}
+
+.gps-status-card {
+    background: white;
+    border-radius: 15px;
+    padding: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.gps-status-card.acquiring {
+    border-left: 4px solid #ffc107;
+}
+
+.gps-status-card.ready {
+    border-left: 4px solid #28a745;
+}
+
+.gps-status-card.error {
+    border-left: 4px solid #dc3545;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-badge.ready {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.acquiring {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.result-modal-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 40px;
+}
+
+.result-modal-icon.success {
+    background: #d4edda;
+    color: #28a745;
+}
+
+.result-modal-icon.error {
+    background: #f8d7da;
+    color: #dc3545;
+}
+
+.result-modal-icon.processing {
+    background: #e2e3e5;
+    color: #6c757d;
+}
+
+.manual-entry-card {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #2D6CDF;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.camera-error {
+    text-align: center;
+    padding: 40px 20px;
+    color: white;
+}
+
+.camera-error i {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.instructions-card {
+    background: linear-gradient(135deg, #2D6CDF 0%, #1a4cb8 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.distance-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 20;
+}
+
+.scanner-wrapper {
+    position: relative;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-md-none">
+    <div class="app-container">
+        <!-- Header -->
+        <div class="app-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <p class="mb-0 opacity-75">Student</p>
+                    <h1>Scan Attendance</h1>
+                </div>
+                <div class="bg-white bg-opacity-25 rounded-circle p-2">
+                    <i class="bi bi-qr-code-scan fs-4"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="px-3">
+            <!-- Instructions -->
+            <div class="instructions-card">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <i class="bi bi-info-circle-fill fs-4"></i>
+                    <div>
+                        <h6 class="mb-1 fw-bold">How to Scan</h6>
+                        <p class="mb-0 small opacity-90">Point camera at teacher's QR code</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GPS Status -->
+            <div id="gpsStatusCard" class="gps-status-card acquiring mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i id="gpsIcon" class="bi bi-arrow-repeat spin text-warning fs-5"></i>
+                        <div>
+                            <h6 class="mb-0 fw-bold">GPS Location</h6>
+                            <small id="gpsText" class="text-muted">Acquiring location...</small>
+                        </div>
+                    </div>
+                    <span id="gpsBadge" class="status-badge acquiring">
+                        <i class="bi bi-circle"></i> Waiting
+                    </span>
+                </div>
+                <div id="gpsDetails" class="mt-2 pt-2 border-top d-none">
+                    <small class="text-muted">
+                        Lat: <span id="latValue">--</span>, 
+                        Lng: <span id="lngValue">--</span>
+                    </small>
+                </div>
+            </div>
+
+            <!-- QR Scanner -->
+            <div class="scanner-wrapper mb-3">
+                <div class="distance-badge d-none" id="distanceBadge">
+                    <i class="bi bi-geo-alt"></i> <span id="distanceValue">--</span>m
+                </div>
+                <div class="scanner-container">
+                    <div id="reader"></div>
+                    <div class="scan-overlay">
+                        <div class="scan-laser"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Entry -->
+            <div class="manual-entry-card">
+                <h6 class="fw-bold mb-3"><i class="bi bi-keyboard me-2"></i>Manual Entry</h6>
+                <div class="input-group">
+                    <input type="text" id="manualQR" class="form-control form-control-lg" 
+                           placeholder="Enter QR code value">
+                    <button class="btn btn-primary" onclick="submitManualQR()">
+                        <i class="bi bi-check-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="{% url 'student_dashboard' %}" class="nav-item">
+                <i class="bi bi-house"></i>
+                <span>Home</span>
+            </a>
+            <a href="#" class="nav-item active">
+                <i class="bi bi-qr-code-scan"></i>
+                <span>Scan</span>
+            </a>
+            <a href="{% url 'logout' %}" class="nav-item">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Logout</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Desktop View -->
+<div class="d-none d-md-block desktop-layout">
+    <div class="desktop-sidebar">
+        <div class="sidebar-logo">
+            <i class="bi bi-qr-code-scan"></i>
+            <h3>QR Attendance</h3>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="{% url 'student_dashboard' %}"><i class="bi bi-house-door"></i>Dashboard</a></li>
+            <li><a href="#" class="active"><i class="bi bi-qr-code-scan"></i>Scan QR</a></li>
+            <li><a href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i>Logout</a></li>
+        </ul>
+    </div>
+
+    <div class="desktop-main">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <p class="text-muted mb-1">Student Portal</p>
+                <h2 class="mb-0">Scan QR Code</h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="app-card">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-qr-code-scan me-2 text-primary"></i>Scanner</h5>
+                    <div class="scanner-wrapper mb-3">
+                        <div class="scanner-container" style="min-height: 300px;">
+                            <div id="reader-desktop"></div>
+                            <div class="scan-overlay">
+                                <div class="scan-laser"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-muted small text-center">Point your camera at the teacher's QR code</p>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="app-card">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-geo-alt me-2 text-success"></i>GPS Status</h5>
+                    <div id="gpsStatusCardDesktop" class="alert alert-warning">
+                        <div class="d-flex align-items-center gap-2">
+                            <i id="gpsIconDesktop" class="bi bi-arrow-repeat spin"></i>
+                            <span id="gpsTextDesktop">Acquiring GPS location...</span>
+                        </div>
+                    </div>
+                    <div id="gpsDetailsDesktop" class="d-none">
+                        <p class="mb-1"><strong>Latitude:</strong> <span id="latValueDesktop">--</span></p>
+                        <p class="mb-3"><strong>Longitude:</strong> <span id="lngValueDesktop">--</span></p>
+                    </div>
+                    <button id="refreshGPSDesktop" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Refresh GPS
+                    </button>
+                </div>
+
+                <div class="app-card mt-3">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-keyboard me-2 text-secondary"></i>Manual Entry</h5>
+                    <div class="input-group">
+                        <input type="text" id="manualQRDesktop" class="form-control form-control-lg" 
+                               placeholder="Enter QR code value">
+                        <button class="btn btn-primary btn-lg" onclick="submitManualQRDesktop()">
+                            <i class="bi bi-check-lg me-2"></i>Submit
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div id="resultIcon" class="result-modal-icon processing">
+                    <div class="loading-spinner"></div>
+                </div>
+                <h4 id="resultTitle" class="mb-2 fw-bold">Processing...</h4>
+                <p id="resultMessage" class="text-muted mb-3">Please wait while we validate your attendance</p>
+                <div id="resultDetails" class="alert alert-light d-none"></div>
+                <button id="resultActionBtn" class="btn btn-primary d-none" onclick="resetScanner()">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Scan Again
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Toast -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+    <div id="errorToast" class="toast align-items-center text-bg-danger border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <span id="errorMessage">Error occurred</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+// Global variables
+let html5QrcodeScanner;
+let currentLatitude = null;
+let currentLongitude = null;
+let gpsRetryCount = 0;
+const MAX_GPS_RETRIES = 3;
+const GPS_RADIUS = parseFloat('{{ gps_radius }}') || 100;
+const SCHOOL_LAT = parseFloat('{{ school_lat }}') || 0;
+const SCHOOL_LNG = parseFloat('{{ school_lng }}') || 0;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initGPS();
+    initQRScanner();
+    
+    // Desktop GPS refresh
+    const refreshBtnDesktop = document.getElementById('refreshGPSDesktop');
+    if (refreshBtnDesktop) {
+        refreshBtnDesktop.addEventListener('click', function() {
+            gpsRetryCount = 0;
+            updateGPSStatusDesktop('acquiring');
+            initGPSDesktop();
+        });
+    }
+});
+
+// GPS Functions
+function initGPS() {
+    if (!navigator.geolocation) {
+        updateGPSStatus('error', 'GPS not supported on this device');
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        handleGPSPosition,
+        handleGPSError,
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+
+function handleGPSPosition(position) {
+    currentLatitude = position.coords.latitude;
+    currentLongitude = position.coords.longitude;
+    
+    // Calculate distance from school
+    const distance = calculateDistance(currentLatitude, currentLongitude, SCHOOL_LAT, SCHOOL_LNG);
+    
+    // Update UI
+    document.getElementById('latValue').textContent = currentLatitude.toFixed(6);
+    document.getElementById('lngValue').textContent = currentLongitude.toFixed(6);
+    
+    // Update desktop if exists
+    const latDesktop = document.getElementById('latValueDesktop');
+    const lngDesktop = document.getElementById('lngValueDesktop');
+    if (latDesktop) latDesktop.textContent = currentLatitude.toFixed(6);
+    if (lngDesktop) lngDesktop.textContent = currentLongitude.toFixed(6);
+    
+    // Show distance badge
+    const distanceBadge = document.getElementById('distanceBadge');
+    const distanceValue = document.getElementById('distanceValue');
+    if (distanceBadge && distanceValue) {
+        distanceValue.textContent = Math.round(distance);
+        distanceBadge.classList.remove('d-none');
+        
+        if (distance <= GPS_RADIUS) {
+            distanceBadge.style.background = '#28a745';
+        } else {
+            distanceBadge.style.background = '#dc3545';
+        }
+    }
+    
+    if (distance <= GPS_RADIUS) {
+        updateGPSStatus('ready', `Location verified (${Math.round(distance)}m from school)`);
+    } else {
+        updateGPSStatus('error', `You are ${Math.round(distance)}m away. Must be within ${GPS_RADIUS}m.`);
+    }
+    
+    gpsRetryCount = 0;
+}
+
+function handleGPSError(error) {
+    console.error('GPS Error:', error);
+    
+    if (gpsRetryCount < MAX_GPS_RETRIES) {
+        gpsRetryCount++;
+        updateGPSStatus('acquiring', `Retrying GPS (${gpsRetryCount}/${MAX_GPS_RETRIES})...`);
+        setTimeout(initGPS, 2000);
+    } else {
+        let errorMsg = 'Location access required for attendance';
+        if (error.code === error.PERMISSION_DENIED) {
+            errorMsg = 'Please enable location permission in your browser settings';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+            errorMsg = 'GPS signal unavailable. Try again outdoors';
+        } else if (error.code === error.TIMEOUT) {
+            errorMsg = 'GPS request timed out. Please retry';
+        }
+        updateGPSStatus('error', errorMsg);
+        showError(errorMsg);
+    }
+}
+
+function updateGPSStatus(status, message) {
+    const card = document.getElementById('gpsStatusCard');
+    const icon = document.getElementById('gpsIcon');
+    const text = document.getElementById('gpsText');
+    const badge = document.getElementById('gpsBadge');
+    const details = document.getElementById('gpsDetails');
+    
+    // Remove all status classes
+    card.classList.remove('acquiring', 'ready', 'error');
+    badge.classList.remove('acquiring', 'ready', 'error');
+    
+    // Add new status class
+    card.classList.add(status);
+    badge.classList.add(status);
+    
+    if (status === 'ready') {
+        icon.className = 'bi bi-check-circle-fill text-success fs-5';
+        badge.innerHTML = '<i class="bi bi-check-circle"></i> Ready';
+        details.classList.remove('d-none');
+    } else if (status === 'error') {
+        icon.className = 'bi bi-exclamation-triangle-fill text-danger fs-5';
+        badge.innerHTML = '<i class="bi bi-x-circle"></i> Error';
+    } else {
+        icon.className = 'bi bi-arrow-repeat spin text-warning fs-5';
+        badge.innerHTML = '<i class="bi bi-circle"></i> Waiting';
+    }
+    
+    if (message) text.textContent = message;
+    
+    // Update desktop if exists
+    updateDesktopGPS(status, message);
+}
+
+function updateDesktopGPS(status, message) {
+    const card = document.getElementById('gpsStatusCardDesktop');
+    const icon = document.getElementById('gpsIconDesktop');
+    const text = document.getElementById('gpsTextDesktop');
+    const details = document.getElementById('gpsDetailsDesktop');
+    
+    if (!card) return;
+    
+    card.className = 'alert alert-' + (status === 'ready' ? 'success' : status === 'error' ? 'danger' : 'warning');
+    
+    if (status === 'ready') {
+        icon.className = 'bi bi-check-circle-fill';
+        if (details) details.classList.remove('d-none');
+    } else if (status === 'error') {
+        icon.className = 'bi bi-exclamation-triangle-fill';
+    } else {
+        icon.className = 'bi bi-arrow-repeat spin';
+    }
+    
+    if (message) text.textContent = message;
+}
+
+function initGPSDesktop() {
+    initGPS();
+}
+
+// QR Scanner Functions
+function initQRScanner() {
+    const readerId = window.innerWidth < 768 ? 'reader' : 'reader-desktop';
+    const readerElement = document.getElementById(readerId);
+    
+    if (!readerElement) return;
+    
+    html5QrcodeScanner = new Html5Qrcode(readerId);
+    
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+    };
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanFailure
+    ).catch(err => {
+        console.error("QR Scanner Error:", err);
+        readerElement.innerHTML = `
+            <div class="camera-error">
+                <i class="bi bi-camera-video-off text-danger"></i>
+                <h5 class="mt-3">Camera Access Required</h5>
+                <p class="small">Please allow camera access to scan QR codes, or use manual entry below.</p>
+                <button class="btn btn-outline-light btn-sm" onclick="retryCamera()">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Retry Camera
+                </button>
+            </div>
+        `;
+    });
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+    // Stop scanning
+    html5QrcodeScanner.stop();
+    
+    // Validate GPS before submitting
+    if (!currentLatitude || !currentLongitude) {
+        showError('Please wait for GPS location to be acquired');
+        resetScanner();
+        return;
+    }
+    
+    const distance = calculateDistance(currentLatitude, currentLongitude, SCHOOL_LAT, SCHOOL_LNG);
+    if (distance > GPS_RADIUS) {
+        showError(`You are ${Math.round(distance)}m away from school. Must be within ${GPS_RADIUS}m.`);
+        resetScanner();
+        return;
+    }
+    
+    // Show processing modal
+    showProcessingModal();
+    
+    // Submit attendance
+    submitAttendance(decodedText);
+}
+
+function onScanFailure(error) {
+    // Silent failure - don't alert on scan errors
+    console.log('Scan error:', error);
+}
+
+function retryCamera() {
+    initQRScanner();
+}
+
+// Attendance Submission
+function submitAttendance(qrValue) {
+    const data = {
+        qr_value: qrValue,
+        latitude: currentLatitude,
+        longitude: currentLongitude
+    };
+    
+    fetch('/api/scan-attendance/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccessModal(data);
+        } else {
+            showErrorModal(data.error || 'Failed to record attendance');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showErrorModal('Network error. Please try again.');
+    });
+}
+
+function submitManualQR() {
+    const qrValue = document.getElementById('manualQR').value.trim();
+    if (!qrValue) {
+        showError('Please enter a QR code value');
+        return;
+    }
+    
+    if (!currentLatitude || !currentLongitude) {
+        showError('GPS location required. Please wait or refresh GPS.');
+        return;
+    }
+    
+    showProcessingModal();
+    submitAttendance(qrValue);
+}
+
+function submitManualQRDesktop() {
+    const qrValue = document.getElementById('manualQRDesktop').value.trim();
+    if (!qrValue) {
+        showError('Please enter a QR code value');
+        return;
+    }
+    
+    if (!currentLatitude || !currentLongitude) {
+        showError('GPS location required. Please wait or refresh GPS.');
+        return;
+    }
+    
+    showProcessingModal();
+    submitAttendance(qrValue);
+}
+
+// Modal Functions
+function showProcessingModal() {
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    const icon = document.getElementById('resultIcon');
+    const title = document.getElementById('resultTitle');
+    const message = document.getElementById('resultMessage');
+    const details = document.getElementById('resultDetails');
+    const actionBtn = document.getElementById('resultActionBtn');
+    
+    icon.className = 'result-modal-icon processing';
+    icon.innerHTML = '<div class="loading-spinner"></div>';
+    title.textContent = 'Processing...';
+    title.className = 'mb-2 fw-bold';
+    message.textContent = 'Please wait while we validate your attendance';
+    message.className = 'text-muted mb-3';
+    details.classList.add('d-none');
+    actionBtn.classList.add('d-none');
+    
+    modal.show();
+}
+
+function showSuccessModal(data) {
+    const icon = document.getElementById('resultIcon');
+    const title = document.getElementById('resultTitle');
+    const message = document.getElementById('resultMessage');
+    const details = document.getElementById('resultDetails');
+    const actionBtn = document.getElementById('resultActionBtn');
+    
+    icon.className = 'result-modal-icon success';
+    icon.innerHTML = '<i class="bi bi-check-lg"></i>';
+    title.textContent = 'Attendance Recorded!';
+    title.className = 'mb-2 fw-bold text-success';
+    
+    // Build success message with SMS notification section
+    let messageHTML = `
+        <div class="alert alert-success mb-3">
+            <p class="mb-1"><strong>✅ ${data.message || 'Attendance recorded successfully!'}</strong></p>
+            <p class="mb-0 small">Status: ${data.status?.toUpperCase()} | Distance: ${data.distance}m from school</p>
+        </div>
+    `;
+    
+    // Check if SMS data is available
+    if (data.sms_data && data.sms_data.sms_link) {
+        const sms = data.sms_data;
+        
+        messageHTML += `
+            <div class="alert alert-info mt-3">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge bg-warning text-dark me-2">🔒 LOCKED</span>
+                    <small class="text-muted">Official School Message</small>
+                </div>
+                
+                <h6 class="fw-bold mb-2">📱 Notify Parent</h6>
+                
+                <div class="bg-white p-2 rounded mb-3 border">
+                    <p class="mb-1"><strong>To:</strong> ${sms.phone_display || sms.phone}</p>
+                    <p class="mb-0 small text-muted" style="font-size: 0.85rem; line-height: 1.4;">
+                        ${sms.message}
+                    </p>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="${sms.sms_link}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-chat-dots-fill"></i> Send SMS to Parent
+                    </a>
+                    
+                    <a href="${sms.whatsapp_link}" class="btn btn-success btn-lg">
+                        <i class="bi bi-whatsapp"></i> Send via WhatsApp
+                    </a>
+                </div>
+                
+                <p class="small text-muted mt-2 mb-0 text-center">
+                    <i class="bi bi-info-circle"></i> 
+                    Student must send this official message. Cannot be edited.
+                </p>
+            </div>
+        `;
+    }
+    
+    message.innerHTML = messageHTML;
+    message.className = 'text-dark';
+    
+    details.classList.add('d-none');
+    actionBtn.classList.add('d-none'); // Hide default action button, we have SMS buttons
+    
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    modal.show();
+}
+
+function showErrorModal(errorMsg) {
+    const icon = document.getElementById('resultIcon');
+    const title = document.getElementById('resultTitle');
+    const message = document.getElementById('resultMessage');
+    const details = document.getElementById('resultDetails');
+    const actionBtn = document.getElementById('resultActionBtn');
+    
+    icon.className = 'result-modal-icon error';
+    icon.innerHTML = '<i class="bi bi-x-lg"></i>';
+    title.textContent = 'Failed';
+    title.className = 'mb-2 fw-bold text-danger';
+    message.textContent = errorMsg;
+    message.className = 'text-danger mb-3';
+    details.classList.add('d-none');
+    actionBtn.classList.remove('d-none');
+}
+
+function resetScanner() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('resultModal'));
+    if (modal) modal.hide();
+    
+    // Clear manual inputs
+    const manualQR = document.getElementById('manualQR');
+    const manualQRDesktop = document.getElementById('manualQRDesktop');
+    if (manualQR) manualQR.value = '';
+    if (manualQRDesktop) manualQRDesktop.value = '';
+    
+    // Restart scanner
+    initQRScanner();
+}
+
+// Utility Functions
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return Math.round(R * c);
+}
+
+function getCSRFToken() {
+    const tokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
+    return tokenElement ? tokenElement.value : '';
+}
+
+function showError(message) {
+    const toast = document.getElementById('errorToast');
+    const messageEl = document.getElementById('errorMessage');
+    if (toast && messageEl) {
+        messageEl.textContent = message;
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    } else {
+        alert(message);
+    }
+}
+</script>
+{% endblock %}

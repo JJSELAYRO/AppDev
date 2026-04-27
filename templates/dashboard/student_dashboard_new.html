@@ -1,0 +1,255 @@
+{% extends 'base_new.html' %}
+{% load static %}
+
+{% block title %}Student Dashboard - QR Attendance{% endblock %}
+
+{% block content %}
+<!-- Mobile View -->
+<div class="d-md-none">
+    <div class="app-container">
+        <!-- Header -->
+        <div class="app-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <p class="mb-0 opacity-75">Welcome back,</p>
+                    <h1>{{ student.user_profile.user.first_name }}</h1>
+                </div>
+                <div class="bg-white bg-opacity-25 rounded-circle p-2">
+                    <i class="bi bi-person fs-4"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="px-3">
+            <!-- BIG Scan Button -->
+            <button class="btn btn-big-action btn-scan mb-4" onclick="location.href='{% url 'scan_qr' %}'">
+                <i class="bi bi-qr-code-scan"></i>
+                <span>SCAN QR CODE</span>
+            </button>
+
+            <!-- Today's Status Card -->
+            <div class="app-card app-card-success mb-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <p class="mb-1 opacity-75">Today's Status</p>
+                        <h3 class="mb-0">
+                            {% if attendance_history.0.date == today %}
+                                {{ attendance_history.0.get_status_display|default:"Not yet recorded" }}
+                            {% else %}
+                                Not yet recorded
+                            {% endif %}
+                        </h3>
+                    </div>
+                    <div class="bg-white bg-opacity-25 rounded-circle p-3">
+                        <i class="bi bi-check-circle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Class Info -->
+            <div class="app-card mb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-primary bg-opacity-10 rounded-4 p-3">
+                        <i class="bi bi-mortarboard fs-3 text-primary"></i>
+                    </div>
+                    <div>
+                        <p class="mb-0 text-muted small">Your Class</p>
+                        <h5 class="mb-0">{{ student.class_group.name|default:"Not assigned" }}</h5>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance History -->
+            <h5 class="fw-bold mb-3">Recent Attendance</h5>
+            
+            {% if attendance_history %}
+            <div class="timeline">
+                {% for attendance in attendance_history|slice:":5" %}
+                <div class="timeline-item {% if attendance.status == 'present' %}success{% endif %}">
+                    <div class="timeline-content">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ attendance.class_group.name }}</h6>
+                                <p class="mb-0 text-muted small">{{ attendance.date|date:"M d, Y" }}</p>
+                            </div>
+                            <span class="status-badge status-{{ attendance.status }}">
+                                <i class="bi bi-{% if attendance.status == 'present' %}check-circle{% elif attendance.status == 'late' %}clock{% else %}x-circle{% endif %}"></i>
+                                {{ attendance.get_status_display }}
+                            </span>
+                        </div>
+                        <p class="mb-0 mt-2 text-muted small">
+                            <i class="bi bi-clock me-1"></i>{{ attendance.time_in|time:"H:i" }}
+                            {% if attendance.sms_sent %}
+                            <span class="ms-2 text-success"><i class="bi bi-check-all"></i> SMS sent</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="app-card text-center py-5">
+                <i class="bi bi-calendar-x fs-1 text-muted mb-3"></i>
+                <p class="text-muted mb-0">No attendance records yet.<br>Tap "Scan QR Code" to start!</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <a href="{% url 'student_dashboard' %}" class="nav-item active">
+                <i class="bi bi-house-fill"></i>
+                <span>Home</span>
+            </a>
+            <a href="{% url 'scan_qr' %}" class="nav-item-scan">
+                <i class="bi bi-qr-code-scan"></i>
+            </a>
+            <a href="{% url 'logout' %}" class="nav-item">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Logout</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Desktop View -->
+<div class="d-none d-md-block desktop-layout">
+    <!-- Sidebar -->
+    <div class="desktop-sidebar">
+        <div class="sidebar-logo">
+            <i class="bi bi-qr-code-scan"></i>
+            <h3>QR Attendance</h3>
+        </div>
+        
+        <ul class="sidebar-menu">
+            <li>
+                <a href="{% url 'student_dashboard' %}" class="active">
+                    <i class="bi bi-house-door"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'scan_qr' %}">
+                    <i class="bi bi-qr-code-scan"></i>
+                    Scan QR
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'logout' %}">
+                    <i class="bi bi-box-arrow-right"></i>
+                    Logout
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="desktop-main">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <p class="text-muted mb-1">Welcome back,</p>
+                <h2 class="mb-0">{{ student.user_profile.user.get_full_name }}</h2>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'scan_qr' %}" class="btn btn-primary-custom btn-lg">
+                    <i class="bi bi-qr-code-scan me-2"></i>Scan QR Code
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stat-grid mb-4">
+            <div class="stat-card">
+                <i class="bi bi-calendar-check text-success"></i>
+                <h3>{{ present_count }}</h3>
+                <p>Present Days</p>
+            </div>
+            <div class="stat-card">
+                <i class="bi bi-clock text-warning"></i>
+                <h3>{{ late_count }}</h3>
+                <p>Late Days</p>
+            </div>
+            <div class="stat-card">
+                <i class="bi bi-x-circle text-danger"></i>
+                <h3>{{ absent_count }}</h3>
+                <p>Absent Days</p>
+            </div>
+            <div class="stat-card">
+                <i class="bi bi-graph-up text-primary"></i>
+                <h3>{{ total_attendance }}</h3>
+                <p>Total Records</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Class Info -->
+            <div class="col-md-4 mb-4">
+                <div class="app-card h-100">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>Your Information</h5>
+                    <div class="mb-3">
+                        <p class="text-muted mb-1">Student ID</p>
+                        <p class="fw-semibold">{{ student.student_id }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-muted mb-1">Class</p>
+                        <p class="fw-semibold">{{ student.class_group.name|default:"Not assigned" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-muted mb-1">Parent Contact</p>
+                        <p class="fw-semibold">{{ student.parent.contact_number|default:"Not set" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance History -->
+            <div class="col-md-8">
+                <div class="app-card">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-clock-history me-2 text-primary"></i>Attendance History</h5>
+                    {% if attendance_history %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Class</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                    <th>SMS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for attendance in attendance_history %}
+                                <tr>
+                                    <td>{{ attendance.date|date:"M d, Y" }}</td>
+                                    <td>{{ attendance.class_group.name }}</td>
+                                    <td>{{ attendance.time_in|time:"H:i" }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if attendance.status == 'present' %}success{% elif attendance.status == 'late' %}warning{% else %}danger{% endif %}">
+                                            {{ attendance.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if attendance.sms_sent %}
+                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                        {% else %}
+                                        <i class="bi bi-dash text-muted"></i>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-calendar-x fs-1 text-muted mb-3"></i>
+                        <p class="text-muted">No attendance records yet. Click "Scan QR Code" to start!</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

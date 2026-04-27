@@ -1,0 +1,847 @@
+`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Q-learn - E-Learning Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #2F80ED;
+            --primary-light: #E3F2FD;
+            --text-dark: #1A1A1A;
+            --text-gray: #6B7280;
+            --text-light: #9CA3AF;
+            --bg-white: #FFFFFF;
+            --bg-light: #F8FAFC;
+            --border-light: #E5E7EB;
+            --shadow-soft: 0 4px 20px rgba(47, 128, 237, 0.15);
+            --shadow-clay: 0 8px 32px rgba(0, 0, 0, 0.08);
+            --radius-sm: 12px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            --radius-xl: 32px;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .mobile-frame {
+            width: 100%;
+            max-width: 414px;
+            height: 896px;
+            max-height: 90vh;
+            background: var(--bg-white);
+            border-radius: 40px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.25),
+                0 0 0 1px rgba(0, 0, 0, 0.05);
+        }
+
+        .app-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            scroll-behavior: smooth;
+        }
+
+        .app-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Screen Styles */
+        .screen {
+            min-height: 100%;
+            padding: 40px 24px;
+            display: none;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .screen.active {
+            display: flex;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Logo */
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 32px;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--primary-blue);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .logo-icon::before {
+            content: '✦';
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-dark);
+            letter-spacing: -0.5px;
+        }
+
+        /* Illustration Container */
+        .illustration-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Student Character */
+        .student-illustration {
+            position: relative;
+            width: 200px;
+            height: 200px;
+        }
+
+        .student-body {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 100px;
+            background: #1a1a2e;
+            border-radius: 60px 60px 40px 40px;
+        }
+
+        .student-head {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70px;
+            height: 80px;
+            background: #FDBA74;
+            border-radius: 35px;
+        }
+
+        .student-hair {
+            position: absolute;
+            bottom: 145px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 50px;
+            background: #1a1a2e;
+            border-radius: 40px 40px 20px 20px;
+        }
+
+        .student-face {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 40px;
+        }
+
+        .eye {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #1a1a2e;
+            border-radius: 50%;
+            top: 12px;
+        }
+
+        .eye.left { left: 8px; }
+        .eye.right { right: 8px; }
+
+        .smile {
+            position: absolute;
+            width: 20px;
+            height: 10px;
+            border: 3px solid #1a1a2e;
+            border-top: none;
+            border-radius: 0 0 20px 20px;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Floating Icons */
+        .floating-icon {
+            position: absolute;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(5deg); }
+        }
+
+        .planet {
+            top: 20px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            border-radius: 50%;
+            box-shadow: 0 8px 24px rgba(255, 107, 107, 0.3);
+            animation-delay: 0s;
+        }
+
+        .planet::before {
+            content: '';
+            position: absolute;
+            width: 70px;
+            height: 15px;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-20deg);
+        }
+
+        .atom {
+            top: 60px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            animation-delay: 0.5s;
+        }
+
+        .atom::before {
+            content: '⚛';
+            font-size: 40px;
+            color: var(--primary-blue);
+        }
+
+        .triangle {
+            bottom: 60px;
+            left: 30px;
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 35px solid #2F80ED;
+            animation-delay: 1s;
+            filter: drop-shadow(0 4px 8px rgba(47, 128, 237, 0.3));
+        }
+
+        .book {
+            bottom: 100px;
+            right: 40px;
+            width: 35px;
+            height: 45px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            border-radius: 4px;
+            animation-delay: 1.5s;
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        .book::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            top: 15px;
+        }
+
+        .star {
+            top: 100px;
+            left: 60px;
+            animation-delay: 0.3s;
+        }
+
+        .star::before {
+            content: '✦';
+            font-size: 24px;
+            color: #F59E0B;
+        }
+
+        /* Typography */
+        .heading-xl {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-dark);
+            line-height: 1.2;
+            margin-bottom: 16px;
+            text-align: center;
+            letter-spacing: -0.5px;
+        }
+
+        .heading-lg {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .text-body {
+            font-size: 16px;
+            color: var(--text-gray);
+            line-height: 1.6;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .text-link {
+            color: var(--primary-blue);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .text-link:hover {
+            text-decoration: underline;
+        }
+
+        .text-small {
+            font-size: 14px;
+            color: var(--text-gray);
+            text-align: center;
+        }
+
+        .text-small a {
+            color: var(--primary-blue);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Form Styles */
+        .form-container {
+            width: 100%;
+            max-width: 360px;
+            margin: 0 auto;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 16px 20px;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            font-size: 16px;
+            font-family: inherit;
+            background: var(--bg-white);
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .input-field:focus {
+            border-color: var(--primary-blue);
+            background: var(--primary-light);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .input-field::placeholder {
+            color: var(--text-light);
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 18px 24px;
+            border: none;
+            border-radius: var(--radius-lg);
+            font-size: 16px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: white;
+            box-shadow: 
+                0 4px 16px rgba(47, 128, 237, 0.4),
+                0 8px 24px rgba(47, 128, 237, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 8px 24px rgba(47, 128, 237, 0.5),
+                0 12px 32px rgba(47, 128, 237, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: var(--bg-white);
+            color: var(--primary-blue);
+            border: 2px solid var(--primary-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary-light);
+        }
+
+        .btn-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .btn-rounded {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+        }
+
+        .btn-rounded .arrow {
+            font-size: 24px;
+        }
+
+        /* Divider */
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-light);
+        }
+
+        .divider span {
+            padding: 0 16px;
+        }
+
+        /* Forgot Password */
+        .forgot-password {
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        .forgot-password a {
+            color: var(--text-gray);
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .forgot-password a:hover {
+            color: var(--primary-blue);
+        }
+
+        /* Onboarding Specific */
+        .onboarding-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding-bottom: 40px;
+        }
+
+        .onboarding-button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-white);
+            border-radius: var(--radius-xl);
+            padding: 8px 8px 8px 24px;
+            box-shadow: var(--shadow-clay);
+            margin-top: 32px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .onboarding-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .onboarding-button-text {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        /* Status Bar Simulation */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .status-icons {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .status-icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Home Indicator */
+        .home-indicator {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 134px;
+            height: 5px;
+            background: var(--text-dark);
+            border-radius: 3px;
+            opacity: 0.3;
+        }
+
+        /* Decorative Elements */
+        .decoration-circle {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.1;
+            background: var(--primary-blue);
+        }
+
+        .circle-1 {
+            width: 300px;
+            height: 300px;
+            top: -100px;
+            right: -100px;
+        }
+
+        .circle-2 {
+            width: 200px;
+            height: 200px;
+            bottom: 100px;
+            left: -50px;
+        }
+
+        /* Laptop Illustration for Login */
+        .laptop-scene {
+            width: 180px;
+            height: 150px;
+            position: relative;
+            margin: 0 auto 32px;
+        }
+
+        .student-at-laptop {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .student-head-sm {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 55px;
+            background: #FDBA74;
+            border-radius: 25px;
+        }
+
+        .student-hair-sm {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 56px;
+            height: 35px;
+            background: #1a1a2e;
+            border-radius: 28px 28px 12px 12px;
+        }
+
+        .laptop-body {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 60px;
+            background: #374151;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .laptop-screen {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            height: 45px;
+            background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+            border-radius: 4px;
+        }
+
+        .laptop-base {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 20px;
+            background: #4B5563;
+            border-radius: 0 0 10px 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-frame">
+        <div class="app-container">
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <span>9:41</span>
+                <div class="status-icons">
+                    <span>📶</span>
+                    <span>📡</span>
+                    <span>🔋</span>
+                </div>
+            </div>
+
+            <!-- Screen 1: Onboarding -->
+            <div class="screen active" id="screen-onboarding">
+                <div class="decoration-circle circle-1"></div>
+                
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    <span class="logo-text">Q-learn</span>
+                </div>
+
+                <div class="illustration-container">
+                    <div class="student-illustration">
+                        <div class="student-hair"></div>
+                        <div class="student-head"></div>
+                        <div class="student-body"></div>
+                        <div class="student-face">
+                            <div class="eye left"></div>
+                            <div class="eye right"></div>
+                            <div class="smile"></div>
+                        </div>
+                        
+                        <!-- Floating Icons -->
+                        <div class="floating-icon planet"></div>
+                        <div class="floating-icon atom"></div>
+                        <div class="floating-icon triangle"></div>
+                        <div class="floating-icon book"></div>
+                        <div class="floating-icon star"></div>
+                    </div>
+                </div>
+
+                <div class="onboarding-content">
+                    <h1 class="heading-xl">Discover and improve your skills.</h1>
+                    <p class="text-body">Start, switch, or advance your career with more than 5,000 courses. Professional Certificates and degrees from world-class universities.</p>
+                    
+                    <div class="onboarding-button" onclick="goToScreen('signup')">
+                        <span class="onboarding-button-text">Get Started</span>
+                        <button class="btn btn-primary btn-rounded">
+                            <span class="arrow">→</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Screen 2: Sign Up -->
+            <div class="screen" id="screen-signup">
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    <span class="logo-text">Q-learn</span>
+                </div>
+
+                <h2 class="heading-lg">Sign Up</h2>
+                <p class="text-small">Already have an account? <a onclick="goToScreen('login')">Sign In</a></p>
+
+                <div class="form-container">
+                    <div class="input-group">
+                        <input type="text" class="input-field" placeholder="Full Name" value="Nicholas Pooran">
+                    </div>
+                    <div class="input-group">
+                        <input type="email" class="input-field" placeholder="Email Address">
+                    </div>
+                    <div class="input-group">
+                        <input type="password" class="input-field" placeholder="Create Password">
+                    </div>
+                    <div class="input-group">
+                        <input type="password" class="input-field" placeholder="Re-enter Password">
+                    </div>
+
+                    <button class="btn btn-primary" onclick="goToScreen('login')">Register</button>
+                </div>
+            </div>
+
+            <!-- Screen 3: Login -->
+            <div class="screen" id="screen-login">
+                <div class="decoration-circle circle-2"></div>
+                
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    <span class="logo-text">Q-learn</span>
+                </div>
+
+                <div class="laptop-scene">
+                    <div class="student-at-laptop">
+                        <div class="student-hair-sm"></div>
+                        <div class="student-head-sm"></div>
+                        <div class="laptop-body">
+                            <div class="laptop-screen"></div>
+                        </div>
+                        <div class="laptop-base"></div>
+                    </div>
+                    
+                    <!-- Floating icons around laptop scene -->
+                    <div class="floating-icon planet" style="top: -20px; right: -10px; width: 35px; height: 35px;"></div>
+                    <div class="floating-icon book" style="top: 20px; left: -15px; width: 25px; height: 30px;"></div>
+                    <div class="floating-icon star" style="bottom: 40px; right: -5px; animation-delay: 0.5s;"></div>
+                </div>
+
+                <h2 class="heading-lg">Welcome Back</h2>
+                <p class="text-small">Don't have an account? <a onclick="goToScreen('signup')">Sign up</a></p>
+
+                <div class="form-container">
+                    <div class="input-group">
+                        <input type="email" class="input-field" placeholder="Email Address" value="nicholas378@gmail.com">
+                    </div>
+                    <div class="input-group">
+                        <input type="password" class="input-field" placeholder="Enter Password">
+                    </div>
+
+                    <button class="btn btn-primary">Sign in</button>
+
+                    <div class="forgot-password">
+                        <a href="#">Forgot your password?</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Home Indicator -->
+            <div class="home-indicator"></div>
+        </div>
+    </div>
+
+    <script>
+        function goToScreen(screenName) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+
+            // Show target screen
+            const targetScreen = document.getElementById(`screen-${screenName}`);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+            }
+        }
+
+        // Add input focus effects
+        document.querySelectorAll('.input-field').forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.style.transform = 'scale(1.02)';
+            });
+            
+            input.addEventListener('blur', function() {
+                this.parentElement.style.transform = 'scale(1)';
+            });
+        });
+
+        // Add button click ripple effect
+        document.querySelectorAll('.btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                const ripple = document.createElement('span');
+                ripple.style.position = 'absolute';
+                ripple.style.width = '20px';
+                ripple.style.height = '20px';
+                ripple.style.background = 'rgba(255, 255, 255, 0.5)';
+                ripple.style.borderRadius = '50%';
+                ripple.style.transform = 'translate(-50%, -50%)';
+                ripple.style.pointerEvents = 'none';
+                ripple.style.animation = 'ripple 0.6s ease-out';
+                
+                const rect = this.getBoundingClientRect();
+                ripple.style.left = (e.clientX - rect.left) + 'px';
+                ripple.style.top = (e.clientY - rect.top) + 'px';
+                
+                this.style.position = 'relative';
+                this.appendChild(ripple);
+                
+                setTimeout(() => ripple.remove(), 600);
+            });
+        });
+
+        // Add ripple animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes ripple {
+                to {
+                    width: 200px;
+                    height: 200px;
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
