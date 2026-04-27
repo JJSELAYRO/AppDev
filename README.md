@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Mobile QR Code Attendance System with GPS Verification and SMS Notification
 
 A modern, mobile-first web application for schools to track student attendance using QR code scanning, GPS location validation, and SMS notifications to parents.
@@ -291,3 +292,7 @@ For issues or questions:
 ---
 
 **Built with Django & Bootstrap 5**
+=======
+# AppDev
+AppDev-PYTHON
+>>>>>>> 5ec2edcc0d0ea2cd22095f28fe4a5982a71a39f3
